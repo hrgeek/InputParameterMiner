@@ -1,6 +1,12 @@
+#!/usr/bin/env python3
+
 import time
 import re
 import requests
+import asyncio
+import aiohttp
+import base64
+from urllib.parse import unquote
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -26,11 +32,25 @@ def setup_selenium(url):
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
 
+    # Configure Selenium-Wire options
+    seleniumwire_options = {
+        'connection_timeout': 120,  # Increase connection timeout
+        'request_timeout': 120,     # Increase request timeout
+        'custom_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 MrColonel',
+            'X-Researcher-Username': 'mrcolonel'
+        }
+    }
+
     # Use selenium-wire to capture network requests
     try:
-        driver = wired_webdriver.Chrome(service=Service(), options=chrome_options)
+        driver = wired_webdriver.Chrome(
+            service=Service(),
+            options=chrome_options,
+            seleniumwire_options=seleniumwire_options
+        )
         driver.get(url)
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))  # Wait for the page to load
+        WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.TAG_NAME, "body")))  # Wait for the page to load
         return driver
     except Exception as e:
         print(f"Error setting up Selenium: {e}")
@@ -87,7 +107,10 @@ def analyze_network_requests(driver, base_domain):
                         'method': request.method,
                         'headers': dict(request.headers),
                         'body': None,
-                        'response': None
+                        'response': {
+                            'headers': dict(request.response.headers) if request.response else None,
+                            'body': None
+                        }
                     }
 
                     if request.body:
@@ -101,10 +124,10 @@ def analyze_network_requests(driver, base_domain):
                     if request.response:
                         try:
                             # Parse JSON response if present
-                            request_data['response'] = json.loads(request.response.body.decode('utf-8'))
+                            request_data['response']['body'] = json.loads(request.response.body.decode('utf-8'))
                         except:
                             # Handle non-JSON response
-                            pass
+                            request_data['response']['body'] = request.response.body.decode('utf-8')
 
                     network_requests.append(request_data)
     except Exception as e:
@@ -134,7 +157,10 @@ def extract_hidden_parameters(driver):
         for cookie in cookies:
             hidden_parameters['cookies'].append({
                 'name': cookie['name'],
-                'value': cookie['value']
+                'value': cookie['value'],
+                'http_only': cookie.get('httpOnly', False),
+                'secure': cookie.get('secure', False),
+                'same_site': cookie.get('sameSite', 'None')
             })
 
         # Extract local storage
@@ -146,65 +172,37 @@ def extract_hidden_parameters(driver):
         print(f"Error extracting hidden parameters: {e}")
     return hidden_parameters
 
-def crawl_website(driver, base_url, base_domain, max_depth=2, current_depth=0, visited_urls=None):
-    """Crawl the website to discover additional pages and JavaScript files."""
-    if visited_urls is None:
-        visited_urls = set()
+async def fetch_js_content(session, url):
+    """Fetch JavaScript file content asynchronously."""
+    try:
+        async with session.get(url, timeout=30) as response:
+            if response.status == 200:
+                return await response.text()
+    except Exception as e:
+        print(f"Error fetching {url}: {e}")
+    return None
 
-    # Stop crawling if max depth is reached
-    if current_depth > max_depth:
-        return visited_urls
-
-    # Get the current page URL
-    current_url = driver.current_url
-    if current_url in visited_urls:
-        return visited_urls
-    visited_urls.add(current_url)
-
-    # Extract all links on the current page
-    soup = BeautifulSoup(driver.page_source, 'html.parser')
-    links = set()
-    for link in soup.find_all('a', href=True):
-        full_url = urljoin(base_url, link['href'])
-        if urlparse(full_url).netloc == base_domain:  # Ensure it's the same domain
-            links.add(full_url)
-
-    # Limit the number of links to process (e.g., first 10 links)
-    links = list(links)[:10]
-
-    # Visit each link and crawl recursively
-    for link in links:
-        if link not in visited_urls:
-            try:
-                driver.get(link)
-                WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))  # Wait for the page to load
-                visited_urls = crawl_website(driver, base_url, base_domain, max_depth, current_depth + 1, visited_urls)
-                time.sleep(0.125)  # Delay to achieve 8 requests per second (1/8 = 0.125 seconds)
-            except Exception as e:
-                print(f"Error crawling {link}: {e}")
-
-    return visited_urls
-
-def search_js_files(driver, base_url, base_domain):
-    """Search JavaScript files for parameters."""
+async def search_js_files(driver, base_url, base_domain):
+    """Search JavaScript files for parameters asynchronously."""
     js_parameters = []
     try:
         # Extract all script tags with src attributes
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         script_tags = soup.find_all('script', src=True)
 
-        for script in script_tags:
-            js_url = urljoin(base_url, script['src'])
-            if urlparse(js_url).netloc == base_domain:  # Filter by domain
-                print(f"Analyzing JavaScript file: {js_url}")
+        async with aiohttp.ClientSession() as session:
+            tasks = []
+            for script in script_tags:
+                js_url = urljoin(base_url, script['src'])
+                if urlparse(js_url).netloc == base_domain:  # Filter by domain
+                    print(f"Analyzing JavaScript file: {js_url}")
+                    tasks.append(fetch_js_content(session, js_url))
 
-                # Fetch the JavaScript file content
-                response = requests.get(js_url)
-                if response.status_code == 200:
-                    js_content = response.text
+            js_contents = await asyncio.gather(*tasks)
 
+            for js_content in js_contents:
+                if js_content:
                     # Search for parameters in the JavaScript file
-                    # Example: Look for API endpoints or hidden parameters
                     api_endpoints = re.findall(r'https?://[^\s\'"]+', js_content)
                     hidden_params = re.findall(r'[\'"]\w+[\'"]\s*:\s*[\'"]\w+[\'"]', js_content)
 
@@ -218,8 +216,76 @@ def search_js_files(driver, base_url, base_domain):
         print(f"Error searching JavaScript files: {e}")
     return js_parameters
 
-def save_results_to_json(results, filename="results.json"):
-    """Save the results to a JSON file."""
+def decode_value(value):
+    """Decode a value if it is encoded (e.g., Base64, URL encoding)."""
+    decoded_value = None
+    try:
+        # Try Base64 decoding
+        decoded_value = base64.b64decode(value).decode('utf-8')
+    except:
+        try:
+            # Try URL decoding
+            decoded_value = unquote(value)
+        except:
+            pass
+    return decoded_value
+
+def test_reflected_values(driver, base_domain):
+    """Test all parameters for reflected values using 'MrColonel'."""
+    reflected_values = []
+    try:
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+
+        # Test query parameters
+        query_params = urlparse(driver.current_url).query
+        if query_params:
+            for param in query_params.split('&'):
+                key, value = param.split('=')
+                # Inject 'MrColonel' into the parameter
+                modified_url = driver.current_url.replace(f"{key}={value}", f"{key}=MrColonel")
+                driver.get(modified_url)
+                WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+                if "MrColonel" in driver.page_source:
+                    decoded_value = decode_value(value)
+                    reflected_values.append({
+                        'url': modified_url,
+                        'key': key,
+                        'original_value': value,
+                        'decoded_value': decoded_value,
+                        'reflected': True
+                    })
+
+        # Test form inputs
+        for input_tag in soup.find_all('input'):
+            if input_tag.get('name'):
+                # Inject 'MrColonel' into the form input
+                input_tag['value'] = 'MrColonel'
+                form = input_tag.find_parent('form')
+                if form:
+                    form_action = form.get('action', driver.current_url)
+                    form_method = form.get('method', 'GET').upper()
+                    form_data = {input_tag['name']: 'MrColonel'}
+                    if form_method == 'GET':
+                        response = requests.get(urljoin(driver.current_url, form_action), params=form_data)
+                    else:
+                        response = requests.post(urljoin(driver.current_url, form_action), data=form_data)
+                    if "MrColonel" in response.text:
+                        decoded_value = decode_value(input_tag.get('value', ''))
+                        reflected_values.append({
+                            'url': urljoin(driver.current_url, form_action),
+                            'key': input_tag['name'],
+                            'original_value': input_tag.get('value', ''),
+                            'decoded_value': decoded_value,
+                            'reflected': True
+                        })
+
+    except Exception as e:
+        print(f"Error testing reflected values: {e}")
+    return reflected_values
+
+def save_results_to_json(results, domain):
+    """Save the results to a JSON file named after the domain."""
+    filename = f"{domain}.json"
     try:
         with open(filename, 'w') as f:
             json.dump(results, f, indent=4)
@@ -227,7 +293,7 @@ def save_results_to_json(results, filename="results.json"):
     except Exception as e:
         print(f"Error saving results to JSON: {e}")
 
-def main():
+async def main():
     url = input("Enter the URL of the site to analyze: ")
 
     # Ensure the URL has a scheme
@@ -249,7 +315,8 @@ def main():
         'input_fields': [],
         'network_requests': [],
         'hidden_parameters': {},
-        'js_files': []
+        'js_files': [],
+        'reflected_values': []
     }
 
     # Extract input fields
@@ -264,20 +331,19 @@ def main():
     print("\nExtracting hidden parameters...")
     results['hidden_parameters'] = extract_hidden_parameters(driver)
 
-    # Crawl the website with a depth limit of 2 (filtered by domain)
-    print("\nCrawling the website to discover additional pages and JavaScript files...")
-    visited_urls = crawl_website(driver, url, base_domain, max_depth=2)
-    print(f"Visited URLs: {visited_urls}")
-
     # Search JavaScript files (filtered by domain)
     print("\nSearching JavaScript files for parameters...")
-    results['js_files'] = search_js_files(driver, url, base_domain)
+    results['js_files'] = await search_js_files(driver, url, base_domain)
+
+    # Test for reflected values using 'MrColonel'
+    print("\nTesting for reflected values using 'MrColonel'...")
+    results['reflected_values'] = test_reflected_values(driver, base_domain)
 
     # Save results to JSON
-    save_results_to_json(results)
+    save_results_to_json(results, base_domain)
 
     # Close the browser
     driver.quit()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
