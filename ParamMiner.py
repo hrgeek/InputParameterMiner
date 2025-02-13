@@ -6,6 +6,8 @@ import requests
 import asyncio
 import aiohttp
 import base64
+import argparse
+import os
 from urllib.parse import unquote
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -17,6 +19,17 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, urlunparse
 import json
+
+def print_welcome_message():
+    welcome_message = """
+    ||==================================================================||
+    ||    Welcome to Input Parameter Miner!                             ||
+    ||    A tool to analyze websites for input fields, network requests,||
+    ||    hidden parameters, and reflected values.                      ||
+    ||    Created by MrColonel()                                        ||
+    ||==================================================================||
+    """
+    print(welcome_message)
 
 def ensure_url_scheme(url):
     """Ensure the URL has a scheme (http:// or https://). If not, add https://."""
@@ -283,9 +296,54 @@ def test_reflected_values(driver, base_domain):
         print(f"Error testing reflected values: {e}")
     return reflected_values
 
-def save_results_to_json(results, domain):
+def crawl_website(driver, base_url, base_domain, max_depth=2, current_depth=0, visited_urls=None):
+    """Crawl the website to discover additional pages and JavaScript files."""
+    if visited_urls is None:
+        visited_urls = set()
+
+    # Stop crawling if max depth is reached
+    if current_depth > max_depth:
+        return visited_urls
+
+    # Get the current page URL
+    current_url = driver.current_url
+    if current_url in visited_urls:
+        return visited_urls
+    visited_urls.add(current_url)
+
+    # Extract all links on the current page
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+    links = set()
+    for link in soup.find_all('a', href=True):
+        full_url = urljoin(base_url, link['href'])
+        if urlparse(full_url).netloc == base_domain:  # Ensure it's the same domain
+            links.add(full_url)
+
+    # Limit the number of links to process (e.g., first 10 links)
+    links = list(links)[:10]
+
+    # Visit each link and crawl recursively
+    for link in links:
+        if link not in visited_urls:
+            try:
+                driver.get(link)
+                WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))  # Wait for the page to load
+                visited_urls = crawl_website(driver, base_url, base_domain, max_depth, current_depth + 1, visited_urls)
+                time.sleep(0.125)  # Delay to achieve 8 requests per second (1/8 = 0.125 seconds)
+            except Exception as e:
+                print(f"Error crawling {link}: {e}")
+
+    return visited_urls
+
+def save_results_to_json(results, domain, output_dir=None):
     """Save the results to a JSON file named after the domain."""
-    filename = f"{domain}.json"
+    if output_dir:
+        # Ensure the output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+        filename = os.path.join(output_dir, f"{domain}.json")
+    else:
+        filename = f"{domain}.json"
+
     try:
         with open(filename, 'w') as f:
             json.dump(results, f, indent=4)
@@ -293,9 +351,8 @@ def save_results_to_json(results, domain):
     except Exception as e:
         print(f"Error saving results to JSON: {e}")
 
-async def main():
-    url = input("Enter the URL of the site to analyze: ")
-
+async def analyze_url(url, output_dir=None, crawl=False, max_depth=2):
+    """Analyze a single URL."""
     # Ensure the URL has a scheme
     url = ensure_url_scheme(url)
     print(f"Using URL: {url}")
@@ -339,11 +396,39 @@ async def main():
     print("\nTesting for reflected values using 'MrColonel'...")
     results['reflected_values'] = test_reflected_values(driver, base_domain)
 
+    # Crawl the website if enabled
+    if crawl:
+        print(f"\nCrawling the website to discover additional pages (max depth: {max_depth})...")
+        visited_urls = crawl_website(driver, url, base_domain, max_depth=max_depth)
+        print(f"Visited URLs: {visited_urls}")
+
     # Save results to JSON
-    save_results_to_json(results, base_domain)
+    save_results_to_json(results, base_domain, output_dir)
 
     # Close the browser
     driver.quit()
+
+async def main():
+    print_welcome_message()  # Print the welcome message at the start
+    parser = argparse.ArgumentParser(description="Analyze a website for input fields, network requests, hidden parameters, and reflected values.")
+    parser.add_argument('-u', '--url', required=True, help="Input [Filename | URL]")
+    parser.add_argument('-o', '--output', help="Directory to save output files")
+    parser.add_argument('-c', '--crawl', action='store_true', help="Crawl pages to extract their parameters")
+    parser.add_argument('-d', '--depth', type=int, default=2, help="Maximum depth to crawl (default 2)")
+    args = parser.parse_args()
+
+    # Check if the input is a file or a single URL
+    if args.url.endswith('.txt'):
+        # Read URLs from the file
+        with open(args.url, 'r') as file:
+            urls = file.read().splitlines()
+    else:
+        # Treat the input as a single URL
+        urls = [args.url]
+
+    # Analyze each URL
+    for url in urls:
+        await analyze_url(url, args.output, args.crawl, args.depth)
 
 if __name__ == "__main__":
     asyncio.run(main())
