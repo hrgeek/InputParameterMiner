@@ -1,2 +1,2 @@
 # InputParameterMiner
-Here is a Website input parameter miner!
+Here Is A Website Input Parameter Miner!
