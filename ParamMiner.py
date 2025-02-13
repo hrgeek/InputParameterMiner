@@ -9,8 +9,15 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, urlunparse
 import json
+
+def ensure_url_scheme(url):
+    """Ensure the URL has a scheme (http:// or https://). If not, add https://."""
+    parsed_url = urlparse(url)
+    if not parsed_url.scheme:
+        url = "https://" + url
+    return url
 
 def setup_selenium(url):
     """Set up Selenium with ChromeDriver to fetch JavaScript-rendered content."""
@@ -222,6 +229,11 @@ def save_results_to_json(results, filename="results.json"):
 
 def main():
     url = input("Enter the URL of the site to analyze: ")
+
+    # Ensure the URL has a scheme
+    url = ensure_url_scheme(url)
+    print(f"Using URL: {url}")
+
     base_domain = urlparse(url).netloc  # Extract the base domain (e.g., example.com)
 
     # Set up Selenium and fetch JavaScript-rendered content
