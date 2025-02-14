@@ -1,22 +1,28 @@
-import os
-import json
-from urllib.parse import urlparse
+import base64
+from urllib.parse import unquote, urlparse
 
 def ensure_url_scheme(url):
-    """Ensure the URL has a scheme."""
+    """Ensure the URL has a scheme (http:// or https://). If not, add https://."""
     parsed_url = urlparse(url)
     if not parsed_url.scheme:
         url = "https://" + url
     return url
 
-def save_results_to_json(results, domain, output_dir=None):
-    """Save results to a JSON file."""
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
-        filename = os.path.join(output_dir, f"{domain}.json")
-    else:
-        filename = f"{domain}.json"
+def decode_value(value):
+    """Decode a value if it is encoded (e.g., Base64, URL encoding)."""
+    decoded_value = None
+    try:
+        decoded_value = base64.b64decode(value).decode('utf-8')
+    except:
+        try:
+            decoded_value = unquote(value)
+        except:
+            pass
+    return decoded_value
 
+def save_results_to_json(results, domain):
+    """Save the results to a JSON file named after the domain."""
+    filename = f"results/{domain}.json"
     try:
         with open(filename, 'w') as f:
             json.dump(results, f, indent=4)
