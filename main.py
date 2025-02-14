@@ -18,7 +18,7 @@ def print_welcome_message():
     Welcome to Input Parameter Miner!
     A tool to analyze websites for input fields, network requests,
     hidden parameters, and reflected values.
-    Created by MrColonel\!/
+    Created by MrColonel()
     ========================================================
     """
     print(welcome_message)
