@@ -4,7 +4,7 @@
     hidden parameters, and reflected values.
 
 	Project Structure:
-		input_parameter_miner/
+		InputParameterMiner/
 		│
 		├── __init__.py
 		├── main.py
