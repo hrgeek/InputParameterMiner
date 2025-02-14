@@ -1,29 +1,41 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="input_parameter_miner",
-    version="1.0.0",
+    name="InputParameterMiner",
+    version="1.0",
     description="A tool to analyze websites for input fields, network requests, hidden parameters, and reflected values.",
     author="MrColonel",
     author_email="mrcolonelhunter@gmail.com",
-    packages=find_packages(),  # Automatically find all packages
+    url="https://github.com/hrgeek/InputParameterMiner.git",
+    packages=find_packages(),
+    include_package_data=True,
     install_requires=[
-        "selenium>=4.0.0",
-        "selenium-wire>=5.1.0",
-        "beautifulsoup4>=4.10.0",
-        "requests>=2.26.0",
-        "aiohttp>=3.8.1",
-        "lxml>=4.6.3",
+        "selenium",
+        "selenium-wire",
+        "beautifulsoup4",
+        "aiohttp",
+        "requests",
+        "argparse"
     ],
     entry_points={
         "console_scripts": [
-            "parameterminer=main:main",  # Update this line
-        ],
+            "parameterminer=InputParameterMiner.main:main"
+        ]
     },
     classifiers=[
-        "Programming Language :: Python :: 3",
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Developers",
+        "Intended Audience :: Information Technology",
         "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
         "Operating System :: OS Independent",
+        "Topic :: Security",
+        "Topic :: Internet :: WWW/HTTP",
+        "Topic :: Software Development :: Testing"
     ],
     python_requires=">=3.7",
 )
