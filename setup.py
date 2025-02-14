@@ -5,8 +5,8 @@ setup(
     version="1.0.0",
     description="A tool to analyze websites for input fields, network requests, hidden parameters, and reflected values.",
     author="MrColonel",
-    author_email="mrcolonelhunter@gmail.com",
-    packages=find_packages(),
+    author_email="mrcolonel@example.com",
+    packages=find_packages(),  # Automatically find all packages
     install_requires=[
         "selenium>=4.0.0",
         "selenium-wire>=5.1.0",
