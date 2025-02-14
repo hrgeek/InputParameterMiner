@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup
 
 def extract_input_fields(driver):
-    """Extract input fields from the page."""
+    """Extract input fields from the JavaScript-rendered page."""
     try:
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         input_fields = []
