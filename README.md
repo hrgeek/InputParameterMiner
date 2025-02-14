@@ -7,9 +7,23 @@ How to Install:
 
 	https://github.com/hrgeek/InputParameterMiner.git
 	cd InputParameterMiner
-	pip3 install -r requirements.txt
+	Make the install.sh Script Executable
+ 	chmod +x install.sh
+  	./install.sh
+   	
 
 How to Run:
 
-    python3 main.py -u https://example.com
-
+	Basic Usage
+		input-parameter-miner -u https://example.com
+	 
+	 Crawl with Custom Depth
+		input-parameter-miner -u https://example.com -c -d 3
+	    
+	Save Results to a Directory
+		input-parameter-miner -u https://example.com -o ./output
+	     
+	Uninstallation
+		If you want to uninstall the tool, you can use pip:
+		pip3 uninstall input_parameter_miner
+	 
