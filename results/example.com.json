@@ -1,0 +1,47 @@
+{
+  "input_fields": [
+    {
+      "type": "text",
+      "name": "username",
+      "id": "username",
+      "placeholder": "Enter your username",
+      "value": ""
+    }
+  ],
+  "network_requests": [
+    {
+      "url": "https://example.com/api/data",
+      "method": "GET",
+      "headers": { ... },
+      "body": null,
+      "response": { ... }
+    }
+  ],
+  "hidden_parameters": {
+    "hidden_inputs": [
+      {
+        "name": "csrf_token",
+        "value": "abc123"
+      }
+    ],
+    "cookies": [ ... ],
+    "local_storage": { ... },
+    "session_storage": { ... }
+  },
+  "js_files": [
+    {
+      "url": "https://example.com/script.js",
+      "api_endpoints": [ ... ],
+      "hidden_parameters": [ ... ]
+    }
+  ],
+  "reflected_values": [
+    {
+      "url": "https://example.com/search?q=MrColonel",
+      "key": "q",
+      "original_value": "test",
+      "decoded_value": null,
+      "reflected": true
+    }
+  ]
+}
