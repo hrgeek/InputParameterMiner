@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-
 import argparse
 import asyncio
 from modules.selenium_setup import setup_selenium
