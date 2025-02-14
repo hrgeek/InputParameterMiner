@@ -33,8 +33,23 @@ How to Install:
 	Make the install.sh Script Executable
  	chmod +x install.sh
   	./install.sh
-   	
+   
+Debugging Tips
 
+	If you still encounter issues:
+	Check the Installed Package
+	pip3 show input_parameter_miner
+
+Alternative: Use a Virtual Environment
+
+	To avoid conflicts with system-wide Python packages, use a virtual environment:
+	Create a Virtual Environment
+	
+		python3 -m venv venv
+		source venv/bin/activate
+	
+	Install the Tool
+		pip install .
 How to Run:
 
 	Basic Usage
