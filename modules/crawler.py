@@ -1,9 +1,12 @@
 import time
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 def crawl_website(driver, base_url, base_domain, max_depth=2, current_depth=0, visited_urls=None):
-    """Crawl the website."""
+    """Crawl the website to discover additional pages and JavaScript files."""
     if visited_urls is None:
         visited_urls = set()
 
@@ -22,7 +25,7 @@ def crawl_website(driver, base_url, base_domain, max_depth=2, current_depth=0, v
         if urlparse(full_url).netloc == base_domain:
             links.add(full_url)
 
-    links = list(links)[:10]  # Limit to first 10 links
+    links = list(links)[:10]
 
     for link in links:
         if link not in visited_urls:
@@ -30,7 +33,7 @@ def crawl_website(driver, base_url, base_domain, max_depth=2, current_depth=0, v
                 driver.get(link)
                 WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
                 visited_urls = crawl_website(driver, base_url, base_domain, max_depth, current_depth + 1, visited_urls)
-                time.sleep(0.125)  # Delay to avoid overloading the server
+                time.sleep(0.125)
             except Exception as e:
                 print(f"Error crawling {link}: {e}")
 
