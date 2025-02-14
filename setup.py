@@ -1,11 +1,11 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="input_parameter_miner",
+    name="input-parameter-miner",
     version="1.0.0",
     description="A tool to analyze websites for input fields, network requests, hidden parameters, and reflected values.",
     author="MrColonel",
-    author_email="mrcolonel@example.com",
+    author_email="mrcolonelhunter@gmail.com",
     packages=find_packages(),  # Automatically find all packages
     install_requires=[
         "selenium>=4.0.0",
@@ -17,7 +17,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "input-parameter-miner=input_parameter_miner.main:main",
+            "InputParameterMiner=InputParameterMiner.main:main",
         ],
     },
     classifiers=[
