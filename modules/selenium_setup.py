@@ -29,3 +29,4 @@ def setup_selenium(url):
     except Exception as e:
         print(f"Error setting up Selenium: {e}")
         return None
+
